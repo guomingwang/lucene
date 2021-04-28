@@ -19,6 +19,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -42,25 +43,28 @@ public class ArticleService {
             file.mkdirs();
         }
 
-        Analyzer ikAnalyzer = new IKAnalyzer(true);
         DirectoryReader directoryReader = DirectoryReader.open(FSDirectory.open(Paths.get(INDEX_PATH)));
         IndexSearcher indexSearcher = new IndexSearcher(directoryReader);
-        String queryStr = "lucene";
-        QueryParser queryParser = new QueryParser("content", ikAnalyzer);
-        Query query = queryParser.parse(queryStr);
-        TopDocs topDocs = indexSearcher.search(query, 10);
+
+        String fieldName = "content";
+        Analyzer ikAnalyzer = new IKAnalyzer(true);
+        QueryParser queryParser = new QueryParser(fieldName, ikAnalyzer);
+
+        String fieldValue = "lucene";
+        int limit = 10;
+        Query query = queryParser.parse(fieldValue);
+        TopDocs topDocs = indexSearcher.search(query, limit);
         ScoreDoc[] scoreDocs = topDocs.scoreDocs;
 
-        ArrayList<Article> articleArrayList = new ArrayList<>();
-        for (ScoreDoc scoreDoc :
-                scoreDocs) {
+        ArrayList<Article> articleList = new ArrayList<>();
+        for (ScoreDoc scoreDoc : scoreDocs) {
             int docId = scoreDoc.doc;
             Document document = indexSearcher.doc(docId);
             Article article = documentToArticle(document);
-            articleArrayList.add(article);
+            articleList.add(article);
         }
         directoryReader.close();
-        return articleArrayList;
+        return articleList;
     }
 
     /**
@@ -78,7 +82,7 @@ public class ArticleService {
         Article article = Article.builder()
                 .id(108L)
                 .author("王磊")
-                .title("offer来了之Lucene学习")
+                .title("Offer来了之Lucene学习")
                 .content("This is a simple lucene demo")
                 .url("https://blog.csdn.net/m0_57488641/article/details/116182742")
                 .build();
@@ -98,15 +102,10 @@ public class ArticleService {
      * @param file
      */
     private void delete(File file) {
-        if (file.isFile()) {
-            file.delete();
-        } else {
-            File[] files = file.listFiles();
-            for (File iFile :
-                    files) {
-                iFile.delete();
-            }
+        if (file.isDirectory()) {
+            Arrays.stream(file.listFiles()).forEach(iFile -> delete(iFile));
         }
+        file.delete();
     }
 
     /**
@@ -117,7 +116,7 @@ public class ArticleService {
      */
     private Document articleToDocument(Article article) {
         Document document = new Document();
-        document.add(new LongPoint("id", article.getId())); // LongPoint：文档的索引id
+        document.add(new LongPoint("id", article.getId())); // LongPoint：文档的id
         document.add(new StoredField("id", article.getId())); // StoredField：不分词、不索引、存储
         document.add(new TextField("title", article.getTitle(), Field.Store.YES)); // TextField：分词、索引
         document.add(new TextField("content", article.getContent(), Field.Store.YES));
